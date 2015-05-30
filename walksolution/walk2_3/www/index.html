@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    
+    <!--
+     * Copyright (c) 2012, Intel Corporation. All rights reserved.
+     * File revision: 15 October 2012
+     * Please see http://software.intel.com/html5/license/samples 
+     * and the included README.md file for license terms and conditions.
+    -->
+    <meta name="copyright" content="&copy; 2012, Intel Corporation. All rights reserved." />
+
+    <!-- stylesheets -->
+    <!-- note: use jquery.mobile-1.1.1.min.css for production -->
+    <link rel="stylesheet" type="text/css" href="vendor/jquery.mobile/jquery.mobile-1.1.1.css" />
+    <link rel="stylesheet" type="text/css" href="css/tomatometer.css" />
+    <link rel="stylesheet" type="text/css" href="css/style.css" />
+    
+    <!-- scripts -->
+    <!-- note: use jquery-1.8.0.min.js & jquery.mobile-1.1.1.min.js for production -->
+    <script type="text/javascript" src="vendor/mustache/mustache.js"></script>
+    <script type="text/javascript" src="vendor/jquery/jquery-1.8.0.js"></script>
+    <script type="text/javascript" src="vendor/jquery.jsonp/jquery.jsonp.js"></script>
+    <script type="text/javascript" src="vendor/jquery.mobile/jquery.mobile-1.1.1.js"></script>
+    <script src="intelxdk.js"></script>
+    <script src="cordova.js"></script>
+    <script src="xhr.js"></script>
+    <script type="text/javascript" src="app/app.js"></script>
+    <!-- title of app -->
+    <title>DVD Rentals</title>
+    
+    <!-- mobile layout sized appropriately to viewport width and not zoomable -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    
+</head>
+
+<body>
+    
+    <!-- initial page to obtain developer key -->
+    <div data-role="page" id="loginPage" data-theme="a">
+
+        <!-- header button to display information dialog page #aboutMsg -->
+        <div data-role="header">
+            <a href="#aboutMsg" data-rel="dialog" data-icon="info" data-iconpos="notext" class="ui-btn-right">Refresh</a>
+        </div>
+
+        <div data-role="content">
+            <!-- form to submit developer key so that app has permission to access Flixster web API -->
+            <form action="#" method="get" id="login">
+                <fieldset>
+                    <!-- input field to enter key -->
+                    <label for="devkey">Please enter your Flixster developer key to begin:</label>
+                    <input type="text" name="devkey" id="devkey"/>
+                </fieldset>
+                <fieldset class="ui-grid-a">
+                    <!-- button to display instructions dialog #getKeyMsg -->
+                    <div class="ui-block-a"><a href="#getKeyMsg" data-role="button">Get Key</a></div>
+                    <!-- button to submit developer key -->
+                    <div class="ui-block-b"><button type="submit" data-theme="b">Submit</button></div>
+                </fieldset>
+            </form>
+        </div>
+    </div>
+    
+    <!-- information dialog page to display Flixster trademark notice -->
+    <div data-role="dialog" id="aboutMsg">
+        <div data-role="header" data-theme="d">
+            <h1>About</h1>
+        </div>
+        <div data-role="content" data-theme="c">
+            <p>Flixster, Rotten Tomatoes, the Fresh Logo, and the Rotten Logo are trademarks or registered trademarks of Flixster, Inc. in the United States and other countries.</p>
+            <a href="page-dialogs.html" data-role="button" data-mini="true" data-rel="back" data-theme="b">OK</a>       
+        </div>
+    </div>
+
+    <!-- dialog page with instructions on how to obtain developer key -->
+    <div data-role="dialog" id="getKeyMsg">
+        <div data-role="header" data-theme="d">
+            <h1>Get Key</h1>
+        </div>
+        <div data-role="content" data-theme="c">
+            <p>Please register for a Flixster developer key at http://developer.rottentomatoes.com/apps/register</p>
+            <a href="page-dialogs.html" data-role="button" data-mini="true" data-rel="back" data-theme="b">OK</a>       
+        </div>
+    </div>
+
+    <!-- error dialog page to be displayed when invalid developer key is submitted -->
+    <div data-role="dialog" id="loginErrorMsg">
+        <div data-role="header" data-theme="d">
+            <h1>Error</h1>
+        </div>
+        <div data-role="content" data-theme="c">
+            <p>
+                Key <span id="wrongkey"></span> is not valid. 
+                Or you did not start Chrome with the &#8209;&#8209;allow&#8209;running&#8209;insecure&#8209;content flag 
+                (necessary for this particular sample; please see http://tinyurl.com/jqmlistview for more detail).<br><br> 
+                Please try again.
+            </p>
+            <a href="page-dialogs.html" data-role="button" data-rel="back" data-theme="b">OK</a>       
+        </div>
+    </div>
+
+    <!-- skeletons for primary pages to be created upon application initialization -->
+    <!-- content of each to be filled on demand during page navigation             -->
+    
+    <!-- template for primary page skeleton -->
+    <script type="text/html" id="primaryPageSkeletonTmpl">
+        <div data-role="page" class="primaryPage">            
+            
+            <!-- header -->
+            <!-- top-right button to refresh entire app with new movie data from Flixster web API -->
+            <div data-role="header" data-id="app-header">
+                <h1>DVD Rentals</h1>
+                <a href="#" data-icon="refresh" data-iconpos="notext" class="ui-btn-right refreshBtn">Refresh</a>
+            </div>
+            
+            <!-- content -->
+            <!-- to contain listview dynamically created with movie data from Flixster web API -->
+            <div data-role="content">
+            </div>
+            
+            <!-- footer -->
+            <!-- navbar to link previous and next pages of movie data -->
+            <div data-role="footer" data-theme="a">
+                <div data-role="navbar">
+                    <ul>
+                        <li><a href="#" class="prev">Previous</a></li>
+                        <li><a href="#" class="next">Next</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+        </div>
+    </script>
+    
+    <!-- template for content of primary pages -->
+    <script type="text/html" id="primaryPageContentTmpl">
+        <ul data-role="listview" class="movies">
+            <!-- mustache section -->
+            {{#.}}
+                <!-- template for each item in given json data -->
+                <li><a href="#secondaryPage" class="movie">
+                    <!-- movie thumbnail image -->
+                    <img src={{posters.thumbnail}} />
+                    <!--title of the movie -->
+                    <h3>{{title}}</h3>
+                    <!-- Rotten Tomatoes critics rating, numeric along with corresponding icon -->
+                    <p>
+                        TOMATOMETER<sup>&reg;</sup> {{ratings.critics_score}}
+                        <i class="icon tiny {{&ratings.critics_rating}}"></i>
+                    </p>
+                </a></li>
+            {{/.}}
+        </ul>
+    </script>
+    
+    <!-- single copy of secondary page skeleton, content and title to be filled on demand -->    
+    <div data-role="page" id="secondaryPage">
+        
+        <!-- header -->
+        <div data-role="header" data-id="app-header">
+            <h1 id="title"></h1>
+            <a href="#" data-rel="back" data-icon="arrow-l" data-iconpos="notext" class="ui-btn-left"></a>
+        </div>
+        
+        <!-- content -->
+        <div data-role="content">
+        </div>
+        
+        <!-- footer -->
+        <div data-role="footer" data-position="fixed">
+        </div>
+        
+    </div>
+    
+    <!-- template for content of secondary pages -->
+    <script type="text/html" id="secondaryPageContentTmpl">
+        <!-- basic movie info highlighted at the top -->
+        <div class="highlight-container">
+            <!-- age-appropriateness rating and runtime in minutes -->
+            <div class="highlight-heading">
+                {{mpaa_rating}}, {{runtime}} minutes
+            </div>
+            <!-- first two cast memebers -->
+            <div class="highlight-details">
+                {{abridged_cast.0.name}}, {{abridged_cast.1.name}}
+            </div>
+            <!-- Rotten Tomatoes critics rating -->
+            <div class="highlight-rating">
+                <!-- numeric rating with corresponding icon -->
+                <div>
+                    <i class="icon small {{&ratings.critics_rating}}"></i> 
+                    {{ratings.critics_score}}
+                </div>
+                <!-- corresponding Tomatometer bar, to be filled with appropriate color and length based on actual rating -->
+                <div>
+                    <div class="tomatometer {{&ratings.critics_rating}}">
+                        <span style="width: {{&ratings.critics_score}};"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- synopsis of the movie -->
+        <p class="synopsis">{{synopsis}}</p>
+    </script>
+    
+</body>
+
+</html>

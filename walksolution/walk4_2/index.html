@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<!--HTML5 doctype-->
+<html>
+
+ <head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" type="text/css" href="jqm/jquery.mobile-min.css">
+  <link rel="stylesheet" type="text/css" href="css/index_main.less.css" class="main-less">
+  <title>Your New Application</title>
+  <meta http-equiv="Content-type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=0">
+  <style type="text/css">
+   /* Prevent copy paste for all elements except text fields */
+   		*  { -webkit-user-select:none; -webkit-tap-highlight-color:rgba(255, 255, 255, 0); }
+   		input, textarea  { -webkit-user-select:text; }
+   		body { background-color:white; color:black }
+  </style>
+  <script src="intelxdk.js"></script>
+  <script type="text/javascript">
+   /* This code is used to run as soon as Intel activates */
+   		var onDeviceReady=function(){
+   		//hide splash screen
+   		intel.xdk.device.hideSplashScreen();
+   		};
+   		document.addEventListener("intel.xdk.device.ready",onDeviceReady,false);
+  </script>
+  <script type="application/javascript" src="js/jquery.min.js"></script>
+  <script type="application/javascript" src="jqm/jquery.mobile-min.js"></script>
+ 
+  <!-- DEFINE TEMPLATES HERE -->
+  <script type="text/template" id="tplBeerItem">
+   <li data-value="{0}" country="{1}">
+     <h3>{2}</h3>
+     <span class="ui-li-count">{3}</span>
+   </li>
+     
+  </script>  
+  
+     
+  <script type="text/javascript">
+     
+     // HELPER FUNCTIONS  
+      
+    String.prototype.format = function () {
+      var args = arguments;
+      return this.replace(/\{(\d+)\}/g, function (m, n) { return args[n]; });
+    };
+      
+      
+     // PAGE INITIALIZATION HANDLER
+      
+     $(document).bind('pageinit',function(event) {
+         var page = event.target.baseURI.split('/');
+         page = page[page.length - 1];
+         
+         if (!App.initialized) {
+            App.initialized = true;
+            App.init();
+         }
+         
+         switch(page) {
+          case 'index.html' :
+                 break;
+          case 'beers.html' :
+                 Beers.init();
+                 break;
+          case 'friends.html' :
+                 break;   
+           case 'drink.html' :
+                 break;
+                 
+         }
+     });
+    
+    // APPLICATION OBJECT 
+    
+    var App = {
+      initialized: false,
+      beers: null,
+        
+      init: function() {
+        this.cacheBeers();  
+      },
+        
+      cacheBeers: function() {
+        var me = this;
+        var url = "http://webapps.figleaf.com/ftxdknew/data/beer.cfc?method=getBeerList&callback=?";
+        $.getJSON(url, function(data) {
+          
+          // sort data here 
+          data.sort(function(a,b) {
+             if (a.country == b.country) {
+               return (a.name < b.name) ? -1 : (a.name > b.name) ? 1 : 0   
+             } else {
+               return (a.country < b.country) ? -1 : 1     
+             }
+          });
+          me.beers = data;
+          console.log(data);
+         
+        });
+      }
+    };
+      
+      
+    // BEERS OBJECT
+      
+   var Beers = {
+     init: function() {
+       this.populateList();   
+     },
+     populateList: function() {
+        var list=$('#beerslist > ul');
+        list.listview({
+           autodividers: true,
+           autodividersSelector: function(li) {
+             return li.attr("country");   
+           }
+        });
+        list.empty();
+        var beerTemplate=$("#tplBeerItem").html();
+        for (var i=0; i<App.beers.length; i++) {
+           var item = App.beers[i];
+           list.append(
+              beerTemplate.format(
+                item.id,
+                item.country,
+                item.name,
+                0
+              )
+           )
+        };
+        list.listview("refresh");
+   
+     }
+   }
+  </script>
+ </head>
+
+ <body>
+  <!-- content goes here-->
+  <div class="uwrap">
+   <div class="upage" id="mainpage" data-role="page">
+    <div class="upage-outer">
+     <div data-role="header" class="container-group inner-element uib_w_1" data-uib="jquery_mobile/header" data-position="fixed">
+      <h1>Friends with Beer</h1>
+      <div class="widget-container wrapping-col single-centered"></div>
+      <div class="widget-container content-area horiz-area wrapping-col left"></div>
+      <div class="widget-container content-area horiz-area wrapping-col right"></div>
+     </div>
+     <div class="upage-content" id="mainsub">
+
+      <div class="grid grid-pad urow uib_row_1 row-height-1" data-uib="layout/row">
+       <div class="col uib_col_1 col-0_12-12" data-uib="layout/col">
+        <div class="widget-container content-area vertical-col">
+
+         <div class="widget uib_w_8 d-margins homepage" data-uib="media/text">
+          <div class="widget-container left-receptacle"></div>
+          <div class="widget-container right-receptacle"></div>
+          <div>
+           <p>In these uncertain economic times you need to keep your friends close, and your beer even closer.</p>
+          </div>
+         </div>
+         <div class="widget uib_w_9 scale-image d-margins" data-uib="media/img">
+          <figure class="figure-align">
+           <img src="resources/beer.jpg" alt="Beer: The cause and solution to all of our problems">
+           <figcaption data-position="bottom"></figcaption>
+          </figure>
+         </div>
+         <div class="widget uib_w_10 d-margins homepage" data-uib="media/text">
+          <div class="widget-container left-receptacle"></div>
+          <div class="widget-container right-receptacle"></div>
+          <div>
+           <p>This app quickly identifies your pals who are most likely to have your favorite brew on ice. Check the traffic
+            conditions around your friend's house, then dial or email them to let them know that you're coming over. Shake
+            your phone to select a beer, er... "friend" at random.</p>
+           <p>No friends? No problem! Our app contains a video of "virtual" friends drinking, so you'll never need to drink
+            alone again!</p>
+          </div>
+         </div><span class="uib_shim"></span>
+        </div>
+       </div>
+       <span class="uib_shim"></span>
+      </div>
+     </div>
+     <!-- /upage-content -->
+
+
+     <div data-role="footer" data-position="fixed" class="container-group inner-element uib_w_2" data-uib="jquery_mobile/footer">
+      <h1></h1>
+      <div class="widget-container wrapping-col single-centered">
+       <div data-role="controlgroup" class="uib-jqm-flex widget-container widget uib_w_3 d-margins" data-uib="jquery_mobile/button_group"
+       data-type="horizontal">
+        <a class="widget uib_w_4" href="index.html" data-transition="slide" data-uib="jquery_mobile/button" data-role="button" data-theme="b"
+        data-icon="home" data-iconpos="top">Home</a>
+        <a class="widget uib_w_5" href="friends.html" data-transition="slide" data-uib="jquery_mobile/button" data-role="button"
+        data-icon="user" data-iconpos="top">Friends</a>
+        <a class="widget uib_w_6" href="beers.html" data-transition="slide" data-uib="jquery_mobile/button" data-role="button" data-icon="heart"
+        data-iconpos="top">Beers</a>
+        <a class="widget uib_w_7 d-margins" href="drink.html" data-transition="slide" data-uib="jquery_mobile/button" data-role="button"
+        data-icon="video" data-iconpos="top">Drink!</a>
+       </div>
+      </div>
+      <div class="widget-container content-area horiz-area wrapping-col left"></div>
+      <div class="widget-container content-area horiz-area wrapping-col right"></div>
+     </div>
+    </div>
+    <!-- /upage-outer -->
+
+   </div>
+   <!-- /upage -->
+
+  </div>
+  <!-- /uwrap -->
+ </body>
+
+</html>

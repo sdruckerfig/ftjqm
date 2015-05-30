@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<!--HTML5 doctype-->
+<html>
+
+ <head>
+
+  <meta charset="UTF-8">
+  <link rel="stylesheet" type="text/css" href="jqm/jquery.mobile-min.css">
+  <link rel="stylesheet" type="text/css" href="css/index_main.less.css" class="main-less">
+  <title>Walkthrough 7-4</title>
+  <meta http-equiv="Content-type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=0">
+  <style type="text/css">
+   /* Prevent copy paste for all elements except text fields */
+   		*  { -webkit-user-select:none; -webkit-tap-highlight-color:rgba(255, 255, 255, 0); }
+   		input, textarea  { -webkit-user-select:text; }
+   		body { background-color:white; color:black }
+        label.error {
+          float: left;
+          color: red;
+          padding-top: 0.5em;
+          vertical-align: top;
+          font-weight: bold;
+        }
+        #contactform {
+          padding-bottom: 50px;  
+        }
+        .contactname {
+          font-weight:bold;      
+        }
+        .contactdistance {
+          font-style:italic;      
+        }
+  </style>
+  <script src="intelxdk.js"></script>
+  <script type="text/javascript">
+   /* This code is used to run as soon as Intel activates */
+   		var onDeviceReady=function(){
+   		//hide splash screen
+   		intel.xdk.device.hideSplashScreen();
+   		};
+   		document.addEventListener("intel.xdk.device.ready",onDeviceReady,false);
+  </script>
+     
+  <script src="http://debug-software.intel.com/target/target-script-min.js#JHBfKiajZepjv1ZsZ3I0TG86dAEmGMVt3ZKKk2G0CI4"></script>
+  <script type="application/javascript" src="js/jquery.min.js"></script>
+  <script type="application/javascript" src="jqm/jquery.mobile-min.js"></script>
+  <script type="text/javascript" src="js/localdb.js"></script>
+  <script type="text/javascript" src="js/jquery.validate.js"></script>
+  <script  src="https://maps.googleapis.com/maps/api/js?v=3.exp&sensor=true&libraries=panoramio"></script>
+  <script type="text/javascript" src="js/jquery.ui.map.js"></script>
+     
+  <!-- LOAD CORDOVA LIBRARY -->
+  <script type="text/javascript" src="cordova.js"></script>
+  
+  <script type="text/javascript" src="js/shake/shake.js"></script>
+ 
+  <!-- DEFINE TEMPLATES HERE -->
+     
+  <script type="text/template" id="tplBeerItem">
+   <li data-value="{0}" country="{1}">
+     <h3>{2}</h3>
+     <span class="ui-li-count">{3}</span>
+   </li>
+  </script>  
+  
+  <script type="text/template" id="tplFriend">
+     <li data-value="{0}">
+       <a href="#"><h3>{1}, {2}</h3></a>
+     </li>
+  </script>
+
+
+  <script type="text/template" id="tplContact">
+   <div class="contactname">{0} {1}</div>
+   <div class="contactaddress">{2}</div>
+   <div class="contactdistance">{3} is only 
+    <span id="distancetofriend"></span> away!
+   </div>
+  </script>   
+     
+  <script type="text/javascript">
+     
+/*
+*
+*
+* HELPER FUNCTIONS
+*
+*
+*/ 
+      
+    String.prototype.format = function () {
+      var args = arguments;
+      return this.replace(/\{(\d+)\}/g, function (m, n) { return args[n]; });
+    };
+      
+    calcDistance = function(lat1,lng1,lat2,lng2) {
+
+         var R = 3959; // use 3959 for miles or 6371 for km
+         var dLat = (lat2-lat1) * Math.PI / 180 ;
+         var dLon = (lng2-lng1)* Math.PI / 180;
+         var lat1 = lat1 * Math.PI / 180;
+         var lat2 = lat2 * Math.PI / 180;
+        
+         var a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.sin(dLon/2) * Math.sin(dLon/2) * Math.cos(lat1) * Math.cos(lat2); 
+         var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+        
+         return (R * c).toFixed(2); 
+    };
+      
+/*
+*
+*
+* PAGE INIT HANDLER
+*
+*
+*/
+      
+     $(document).bind('pageinit',function(event) {
+         var page = event.target.baseURI.split('/');
+         page = page[page.length - 1];
+         
+         if (!App.initialized) {
+            App.initialized = true;
+            App.init();
+         }
+         
+         switch(page) {
+          case 'index.html' :
+            break;
+          case 'beers.html' :
+            Beers.init();
+            break;
+          case 'friends.html' :
+            Contacts.init();
+            break;   
+          case 'drink.html' :
+            break;
+          case 'contactform.html' :
+            ContactForm.init();
+            break;
+          case 'contactdetail.html' :
+            ContactDetail.init();
+            break;
+                 
+         }
+     });
+    
+/*
+*
+*
+* APP CONTROLLER
+*
+*
+*/
+    var App = {
+      initialized: false,
+      beers: null,
+        
+      init: function() {
+        this.cacheBeers(); 
+        window.addEventListener(
+          'shake',
+          App.handleAppShake,
+          false
+        );
+        
+      },
+        
+      cacheBeers: function() {
+        var me = this;
+        var url = "http://webapps.figleaf.com/ftxdknew/data/beer.cfc?method=getBeerList&callback=?";
+        $.getJSON(url, function(data) {
+          
+          // sort data here 
+          data.sort(function(a,b) {
+             if (a.country == b.country) {
+               return (a.name < b.name) ? -1 : (a.name > b.name) ? 1 : 0   
+             } else {
+               return (a.country < b.country) ? -1 : 1     
+             }
+          });
+          FriendsWithBeerDB.importTable('beer',data);
+          me.beers = data;
+          console.log(data);
+         
+        });
+      },
+      getRandomFriend: function(callback) {
+             FriendsWithBeerDB.runQuery("select count(*) as thecount from friend", 
+                function(records) {
+                 var randomNum = Math.floor(Math.random() * records[0].thecount) + 1;
+                 FriendsWithBeerDB.runQuery(new String().concat(" select *",
+                                                 " from friend",
+                                                 " where id not in ( ",
+                                                 "    select id ",
+                                                 "    from friend ",
+                                                 "    limit " + (randomNum - 1),
+                                                 " )",
+                                                 " limit 1"), 
+                             function(record) {
+                               callback.call(App,record[0]);
+                             }
+                  );
+                }
+            );  
+            
+        },
+        handleAppShake: function() {
+           
+           App.getRandomFriend(function(record) {
+             ContactDetail.friendId = record.id;
+             ContactForm.friendId = record.id;
+             $.mobile.changePage('contactdetail.html');
+           });
+       }
+    }; // end of APP
+      
+      
+/*
+*
+*
+* BEERS LIST CONTROLLER
+*
+*
+*/
+      
+   var Beers = {
+     init: function() {
+       this.populateList();   
+     },
+     populateList: function() {
+          
+        var list=$('#beerslist > ul');
+        list.listview({
+           autodividers: true,
+           autodividersSelector: function(li) {
+             return li.attr("country");   
+           }
+        });
+        list.empty();
+        var beerTemplate=$("#tplBeerItem").html();
+         
+         
+        var sql = ''.concat(
+         'select beer.id,beer.name,beer.type,beer.country,count(friend.id) as thecount ',
+         'from beer left join friend ',
+         'on beer.id = friend.beerId ',
+         'group by beer.id,beer.name,beer.type,beer.country ',
+         'order by beer.country, beer.name'
+        );
+        
+        // execute sql query here 
+        FriendsWithBeerDB.runQuery(sql,function(records) {
+           for (var i=0; i<records.length; i++) {
+             var item = records[i];
+            list.append(
+               beerTemplate.format(
+                 item.id,
+                 item.country,
+                 item.name,
+                 item.thecount
+               )
+            );
+           }
+           list.listview('refresh');
+        });
+     }
+  }
+
+/*
+*
+*
+* CONTACTLIST CONTROLLER
+*
+*
+*/
+
+  var Contacts = {
+       
+    // initialize on page load   
+    init: function() { 
+     this.displayList();
+     $("#btnImportContacts").bind("tap", function(e) {
+        if (navigator.contacts) {
+          var friendName = window.prompt(
+            "Enter your contact's name, email, or phone",
+            ""
+          );
+          if (friendName != null && friendName != "") {
+            Contacts.importContacts(friendName);   
+          }
+        } else {
+          alert("Function is not available");   
+        }
+     });
+     
+      $("#btnAdd").bind("tap", function(e) {
+         ContactForm.friendId = null; 
+      });
+          
+    },
+    
+    // dynamically generate contacts list (Lab 4)
+    displayList: function() {
+       var list = $("#friendsList > ul");
+    
+       var friendTemplate = $("#tplFriend").html();
+        
+       list.empty();
+        
+       var sql = "select * from friend order by lastName,firstName";
+        
+       FriendsWithBeerDB.runQuery(sql, function(records) {
+           for (var i=0; i<records.length; i++) {
+            var item = records[i];
+            list.append(
+             friendTemplate.format(item.id, item.lastName, item.firstName)   
+                
+            );
+           }
+           $('#friendsList li').bind('tap', function(e) {
+              ContactForm.friendId = this.getAttribute('data-value');
+              ContactDetail.friendId = ContactForm.friendId;
+              $.mobile.changePage('contactdetail.html');
+               
+           });
+           list.listview("refresh");
+       });
+    },
+    
+    // kick off process import contacts from Cordova API 
+    importContacts: function(friendName) {
+      $.mobile.loading('show',{
+        text: "Please Wait",
+        textVisible: true,
+        theme: "a",
+        textonly: false,
+        html: ""
+      });
+      
+      var options = new ContactFindOptions();
+    
+      options.filter = friendName;
+      options.multiple = true;
+    
+      var fields= [
+        "displayName",
+        "name",
+        "addresses",
+        "phoneNumbers",
+        "emails"
+      ];
+    
+      navigator.contacts.find(
+        fields,
+        this.onImport,
+        this.onImportError,
+        options
+      );
+                    
+    },
+    
+    // return "preferred" address, phone, email, etc... 
+    getPreferred: function(arr) {
+
+      for (var i=0; i<arr.length; i++) {
+        if (arr[i].pref) {
+          return arr[i];   
+         }
+        }
+        if (arr.length > 0) {
+         return arr[0]
+        } else {
+         return null;
+        }
+    },
+    
+    // handle returned contact data from Cordova API 
+    onImport: function(contacts) {
+      
+      $.mobile.loading("hide");
+      
+      var address = null;
+      var phone = null;
+      var email = null;
+      var count = 0;
+      var friend = null;
+        
+      for (var i=0; i< contacts.length; i++ ) {
+       
+          if (contacts[i].name.givenName != undefined) {
+           
+              count++;
+              friend = [
+                  {
+                      name: "firstName",
+                      value: contacts[i].name.givenName
+                  },
+                  {
+                      name: "lastName",
+                      value: contacts[i].name.familyName
+                  }
+                  
+              ];
+              
+              if (contacts[i].addresses) {
+               address = Contacts.getPreferred(contacts[i].addresses);
+               friend.push(
+                   {name: "address", value: address.streetAddress}
+               );
+               friend.push(
+                   {name: "zipcode", value: address.postalCode}
+               );
+              }
+              
+              if (contacts[i].phoneNumbers) {
+                friend.push(
+                    {name: "phone", 
+                     value: Contacts.getPreferred(contacts[i].phoneNumbers).value
+                    }
+                );   
+                
+              }
+              
+              if (contacts[i].emails) {
+                friend.push(
+                    {name: "email", 
+                     value: Contacts.getPreferred(contacts[i].emails).value
+                    }
+                );    
+              }
+              
+              FriendsWithBeerDB.writeRecord('friend',null,friend);
+              
+          }
+          
+          
+      }
+        
+      alert(count + " Contacts Imported");
+      setTimeout("Contacts.displayList()",500);
+        
+    },
+    
+    // D'oh!
+    onImportError: function(err) {
+    
+
+    }
+  }
+  
+/*
+*
+*
+* CONTACTFORM CONTROLLER
+*
+*
+*/
+
+  var ContactForm = {
+   friendId: null,
+   init: function() {
+       this.populateBeerField();  
+       this.initValidation();
+       var me = this;
+       $("#btnSave").bind("tap", function(e) {
+          me.submitForm(); 
+       });
+       this.loadRecord();
+       $("#address").bind("change",this.geoCode);
+       $("#zipcode").bind("change",this.geoCode);
+   },
+   geoCode: function() {
+     var geocoder = new google.maps.Geocoder();
+     geocoder.geocode({
+        address: $('#address').val() + " " +  $('#zipcode').val()
+      },
+      function(results,status) {
+         if (status != google.maps.GeocoderStatus.OK) {
+           alert("Address not found");
+           $("#lat").val('');
+           $("#lng").val('');  
+         } else {
+           $("#lat").val(
+            results[0].geometry.location.lat()
+           );
+           $("#lng").val(
+           results[0].geometry.location.lng()
+           );   
+         }
+      }
+     );
+   },
+   loadRecord: function() {
+     if (this.friendId != null) {
+        var sql = "select * from friend where id = " + this.friendId;
+        
+        FriendsWithBeerDB.runQuery(sql, function(records) {
+           var rec = records[0];
+           
+           for (var i in rec) {
+             $("#" + i).val(rec[i]);   
+           }
+            
+           $("#beerId").selectmenu("refresh",true);
+        });
+     }
+   },
+   populateBeerField: function() {
+       var beerField = $("select#beerId");
+       for (var i=0; i<App.beers.length; i++) {
+         beerField.append(
+           '<option value="{0}">{1}</option>'.format(
+             App.beers[i].id,
+             App.beers[i].name
+           )
+         );
+       }
+       beerField.selectmenu("refresh",true);
+   },
+   initValidation: function() {
+     var form = $("form#contactform");
+     form.validate({
+        rules: {
+           lastName: {
+             required: true,
+             rangelength: [2,20]
+           },
+           firstName: {
+             required: true   
+           },
+           address: {
+             required: true   
+           }, 
+           zipcode: {
+             required: true,
+             digits: true
+           }
+            
+        }
+     });
+   },
+   submitForm: function() {
+     var form = $("form#contactform");
+     var validator = form.validate();
+     validator.form();
+     if (validator.numberOfInvalids() == 0) {
+        var fields = form.serializeArray();
+        
+        fields.push({
+          name: 'lat',
+          value: $('#lat').val()
+        });
+        
+        fields.push({
+          name: 'lng',
+          value: $('#lng').val()
+        });
+         
+        FriendsWithBeerDB.writeRecord(
+          'friend',
+          this.friendId,
+          fields,
+          function() {
+            alert("Record Saved");
+            $.mobile.changePage('friends.html');
+          }
+        );
+         
+     } else {
+       alert("Invalid input. Please correct your data input");
+     }
+   }
+      
+  }
+
+/*
+*
+*
+* CONTACTDETAILS CONTROLLER
+*
+*
+*/
+
+  var ContactDetail = {
+    friendId: null,
+    gMap: null,
+    contactData: null,
+    mapCenter: null,
+    init: function() {
+      var me = this;
+      FriendsWithBeerDB.runQuery(
+       "select friend.*, beer.name beername from friend LEFT JOIN beer on friend.beerid = beer.id where friend.id = " + this.friendId,
+       function(records) {
+         me.contactData = records[0];
+         me.mapCenter = new google.maps.LatLng(
+           records[0].lat,
+           records[0].lng
+         );
+         me.initMap();
+         // walkthrough 7-1, step 17
+         me.outputDetails();
+         // walkthrough 7-1, step 27
+         me.outputDistance();
+         me.configureButtons();
+       }
+      );
+    },
+    configureButtons: function() {
+        $("#btnPhone").bind("tap", function(e) {
+           var ph = ContactDetail.contactData.phone;
+           if (ph != "") {
+            var telLink = "tel:" + ph;
+            location.href = telLink;
+           } else {
+            alert("Phone number is not available");   
+           }
+        });
+        
+        $("#btnMail").bind("tap",function(e) {
+           var mailLink = "mailto:{0}?subject={1}&body={2}";
+           mailLink = mailLink.format(
+             ContactDetail.contactData.email,
+             escape("Can I come over now?"),
+             escape("Need to chat about something huge!!!")
+           );
+           location.href = mailLink;
+        });
+        
+        $("#btnNav").bind("tap",function(e) {
+           if (/Android/i.test(navigator.userAgent)) {
+             var mapsUrl = "http://maps.google.com/maps?daddr={0},{1}&saddr={2},{3}";
+             mapsUrl = mapsUrl.format(
+               ContactDetail.contactData.lat, 
+               ContactDetail.contactData.lng,
+               ContactDetail.currentPosition.lat(),
+               ContactDetail.currentPosition.lng()
+             );
+             window.open(mapsUrl,"_blank","location=yes");
+           } else if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+              var mapsUrl = "maps://?daddr={0},{1}&saddr={2},{3}";  
+              mapsUrl = mapsUrl.format(
+               ContactDetail.contactData.lat, 
+               ContactDetail.contactData.lng,
+               ContactDetail.currentPosition.lat(),
+               ContactDetail.currentPosition.lng()
+              );
+              location.href=mapsUrl;
+           } else {
+            alert("Device not supported!");   
+           }
+        });
+    },
+    outputDistance: function() {
+      var me = this;
+      navigator.geolocation.getCurrentPosition(
+        function(position) {
+            me.currentPosition = new google.maps.LatLng(
+              position.coords.latitude,
+              position.coords.longitude
+            );
+            var miles = calcDistance(
+              me.mapCenter.lat(),
+              me.mapCenter.lng(),
+              position.coords.latitude,
+              position.coords.longitude
+            );
+            $("#distancetofriend").html(miles +  " miles ");
+        },
+        function(error) {
+            alert("Could not get current position");
+        }
+      );
+    },
+    outputDetails: function() {
+      var tplContact = $("#tplContact").html();
+      var html = tplContact.format(
+        this.contactData.firstName,
+        this.contactData.lastName, 
+        this.contactData.address,
+        this.contactData.beername
+      );
+      $("#contactdetails").html(html);
+    },
+    initMap: function() {
+      var $mapContainer = $("#map");
+      this.gMap = $mapContainer.gmap({
+         center: this.mapCenter,
+         zoom: 16,
+         callback: function(map) {
+           var trafficLayer = new google.maps.TrafficLayer();
+           trafficLayer.setMap(map);
+           
+           var panoramioLayer = new google.maps.panoramio.PanoramioLayer();
+           panoramioLayer.setMap(map);
+             
+           this.addMarker({
+              position: map.getCenter() 
+           });
+         }
+      });
+      $mapContainer.height($("body").height() - 200);
+      setTimeout("$('#map').gmap('refresh')",500);
+    }
+
+  }
+ 
+/*
+*
+*
+* NOTIFICATIONS CONTROLLER
+*
+*
+*/
+      
+    var notifications = {
+        didAdd : false,
+        register: function(event) {
+           
+            if(event.success === false) {
+                if (notifications.didAdd === false) {
+                    notifications.didAdd = true;
+                    // intel.xdk.notification.alert("Doing addPushUser now...","My Message","OK");
+                    //Try adding the user now - sending unique user id, password, and email address.
+                    intel.xdk.notification.addPushUser(intel.xdk.device.uuid, intel.xdk.device.uuid, 'no@email.com');
+                    //This will fire the push.enable event again, so that is why we use didAdd to make sure
+                    //we dont add the user twice if this fails for any reason.
+                    return;
+                }
+                intel.xdk.notification.alert("Notifications Failed: " + event.message,"My Message","OK");
+                return;
+            }
+            var msg = event.message || 'success';
+            // intel.xdk.notification.alert("Notifications Enabled: " + msg,"My Message","OK");
+        },
+        
+        receivedPush : function(){
+            //Get the notifications object
+            var myNotifications=intel.xdk.notification.getNotificationList();
+            // It may contain more than one message, so iterate over them
+            var len=myNotifications.length;
+            if(len > 0) {
+                for(i=0; i < len; i++) {
+                    //Get message object
+                    msgObj=intel.xdk.notification.getNotificationData(myNotifications[i]);
+                    try{
+                        if(typeof msgObj == "object" && msgObj.id == myNotifications[i]){
+                            //Display the message now.
+                            //You can do this however you like - it doesn't have to be an alert.
+                            // intel.xdk.notification.alert(msgObj.msg + "<br>" + msgObj.data ,"Beer Alert!","OK");
+                            //Always mark the messages as read and delete them.
+                            //If you dont, your users will get them over and over again.
+                            intel.xdk.notification.alert(msgObj.msg + "<br>" + msgObj.data ,"Beer Alert!","OK");
+                            intel.xdk.notification.deletePushNotifications(msgObj.id);
+                            return;
+                        }
+                        intel.xdk.notification.alert("Invalid Message Object: " + i,"My Message","OK");
+                    }catch(e){
+                        intel.xdk.notification.alert("Caught Exception For: " + msgObj.id,"My Message","OK");
+                        //Always mark the messages as read and delete them.
+                        //If you dont, your users will get them over and over again.
+                        intel.xdk.notification.deletePushNotifications(msgObj.id);
+                    }
+                }
+            }
+        }
+    };  
+
+  </script>
+ </head>
+
+ <body>
+  <!-- content goes here-->
+  <div class="uwrap">
+   <div class="upage" id="mainpage" data-role="page">
+    <div class="upage-outer">
+     <div data-role="header" class="container-group inner-element uib_w_1" data-uib="jquery_mobile/header" data-position="fixed">
+      <h1>Friends with Beer</h1>
+      <div class="widget-container wrapping-col single-centered"></div>
+      <div class="widget-container content-area horiz-area wrapping-col left"></div>
+      <div class="widget-container content-area horiz-area wrapping-col right"></div>
+     </div>
+     <div class="upage-content" id="mainsub">
+
+      <div class="grid grid-pad urow uib_row_1 row-height-1" data-uib="layout/row">
+       <div class="col uib_col_1 col-0_12-12" data-uib="layout/col">
+        <div class="widget-container content-area vertical-col">
+
+         <div class="widget uib_w_8 d-margins homepage" data-uib="media/text">
+          <div class="widget-container left-receptacle"></div>
+          <div class="widget-container right-receptacle"></div>
+          <div>
+           <p>In these uncertain economic times you need to keep your friends close, and your beer even closer.</p>
+          </div>
+         </div>
+         <div class="widget uib_w_9 scale-image d-margins" data-uib="media/img">
+          <figure class="figure-align">
+           <img src="resources/beer.jpg" alt="Beer: The cause and solution to all of our problems">
+           <figcaption data-position="bottom"></figcaption>
+          </figure>
+         </div>
+         <div class="widget uib_w_10 d-margins homepage" data-uib="media/text">
+          <div class="widget-container left-receptacle"></div>
+          <div class="widget-container right-receptacle"></div>
+          <div>
+           <p>This app quickly identifies your pals who are most likely to have your favorite brew on ice. Check the traffic
+            conditions around your friend's house, then dial or email them to let them know that you're coming over. Shake
+            your phone to select a beer, er... "friend" at random.</p>
+           <p>No friends? No problem! Our app contains a video of "virtual" friends drinking, so you'll never need to drink
+            alone again!</p>
+          </div>
+         </div><span class="uib_shim"></span>
+        </div>
+       </div>
+       <span class="uib_shim"></span>
+      </div>
+     </div>
+     <!-- /upage-content -->
+
+
+     <div data-role="footer" data-position="fixed" class="container-group inner-element uib_w_2" data-uib="jquery_mobile/footer">
+      <h1></h1>
+      <div class="widget-container wrapping-col single-centered">
+       <div data-role="controlgroup" class="uib-jqm-flex widget-container widget uib_w_3 d-margins" data-uib="jquery_mobile/button_group"
+       data-type="horizontal">
+        <a class="widget uib_w_4" href="index.html" data-transition="slide" data-uib="jquery_mobile/button" data-role="button" data-theme="b"
+        data-icon="home" data-iconpos="top">Home</a>
+        <a class="widget uib_w_5" href="friends.html" data-transition="slide" data-uib="jquery_mobile/button" data-role="button"
+        data-icon="user" data-iconpos="top">Friends</a>
+        <a class="widget uib_w_6" href="beers.html" data-transition="slide" data-uib="jquery_mobile/button" data-role="button" data-icon="heart"
+        data-iconpos="top">Beers</a>
+        <a class="widget uib_w_7 d-margins" href="drink.html" data-transition="slide" data-uib="jquery_mobile/button" data-role="button"
+        data-icon="video" data-iconpos="top">Drink!</a>
+       </div>
+      </div>
+      <div class="widget-container content-area horiz-area wrapping-col left"></div>
+      <div class="widget-container content-area horiz-area wrapping-col right"></div>
+     </div>
+    </div>
+    <!-- /upage-outer -->
+
+   </div>
+   <!-- /upage -->
+
+  </div>
+  <!-- /uwrap -->
+ </body>
+
+</html>
